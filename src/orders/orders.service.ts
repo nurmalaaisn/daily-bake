@@ -14,7 +14,6 @@ export class OrdersService {
     constructor(private prisma: PrismaService) { }
 
     async create(customerId: string, dto: CreateOrderDto) {
-        // Validasi semua produk & stok
         const productIds = dto.items.map((i) => i.productId);
         const products = await this.prisma.product.findMany({
             where: { id: { in: productIds }, isAvailable: true },
@@ -34,25 +33,17 @@ export class OrdersService {
             }
         }
 
-        // Hitung total harga
         let totalPrice = 0;
         const orderItems = dto.items.map((item) => {
             const product = products.find((p) => p.id === item.productId)!;
             const price = Number(product.price);
             const subtotal = price * item.quantity;
             totalPrice += subtotal;
-            return {
-                productId: item.productId,
-                quantity: item.quantity,
-                price,
-                subtotal,
-            };
+            return { productId: item.productId, quantity: item.quantity, price, subtotal };
         });
 
-        // Generate order code
         const orderCode = `DB-${Date.now()}`;
 
-        // Buat order dalam satu transaksi
         const order = await this.prisma.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
                 data: {
@@ -61,7 +52,11 @@ export class OrdersService {
                     pickupDate: new Date(dto.pickupDate),
                     pickupTime: dto.pickupTime,
                     totalPrice,
+                    paymentMethod: dto.paymentMethod,
                     notes: dto.notes,
+                    recipientName: dto.recipientName,
+                    recipientPhone: dto.recipientPhone,
+                    recipientAddress: dto.recipientAddress,
                     orderItems: { create: orderItems },
                 },
                 include: {
@@ -70,7 +65,6 @@ export class OrdersService {
                 },
             });
 
-            // Catat status log awal
             await tx.orderStatusLog.create({
                 data: {
                     orderId: newOrder.id,
@@ -79,7 +73,6 @@ export class OrdersService {
                 },
             });
 
-            // Kurangi stok
             for (const item of dto.items) {
                 await tx.product.update({
                     where: { id: item.productId },
@@ -90,11 +83,8 @@ export class OrdersService {
             return newOrder;
         });
 
-        return {
-            message: 'Pesanan berhasil dibuat',
-            data: order,
-        };
-    } // ← kurung tutup create yang tadinya hilang
+        return order;
+    }
 
     async findMyOrders(customerId: string) {
         return this.prisma.order.findMany({
@@ -102,6 +92,7 @@ export class OrdersService {
             include: {
                 orderItems: { include: { product: true } },
                 statusLogs: { orderBy: { changedAt: 'desc' } },
+                reviews: true,
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -135,12 +126,7 @@ export class OrdersService {
 
         return {
             data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
 
@@ -154,55 +140,47 @@ export class OrdersService {
                     include: { user: { select: { id: true, name: true, role: true } } },
                     orderBy: { changedAt: 'asc' },
                 },
+                reviews: {
+                    include: { customer: { select: { id: true, name: true } } },
+                },
             },
         });
-
-        if (!order) throw new NotFoundException('Data tidak tersedia');
+        if (!order) throw new NotFoundException('Order tidak ditemukan');
         return order;
     }
 
     async updateStatus(id: string, changedBy: string, dto: UpdateOrderStatusDto) {
         const order = await this.findOne(id);
 
-        // Kalau status sudah final, tidak bisa diubah lagi
-        if (
-            order.status === OrderStatus.COMPLETED ||
-            order.status === OrderStatus.CANCELLED
-        ) {
-            throw new BadRequestException(
-                `Order sudah berstatus ${order.status}, tidak dapat diubah lagi`,
-            );
-        }
-
-        // Validasi alur status
-        const allowedTransitions: Record<string, OrderStatus[]> = {
-            PENDING: [OrderStatus.PROCESSED, OrderStatus.CANCELLED],
-            PROCESSED: [OrderStatus.READY],
+        const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
+            PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+            CONFIRMED: [OrderStatus.BAKING, OrderStatus.CANCELLED],
+            BAKING: [OrderStatus.READY],
             READY: [OrderStatus.COMPLETED],
+            COMPLETED: [],
+            CANCELLED: [],
         };
 
-        if (!allowedTransitions[order.status]?.includes(dto.status)) {
+        if (!allowedTransitions[order.status].includes(dto.status)) {
             throw new BadRequestException(
-                `Tidak dapat mengubah status dari ${order.status} ke ${dto.status}`,
+                `Tidak bisa mengubah status dari ${order.status} ke ${dto.status}`,
             );
         }
 
-        const updated = await this.prisma.$transaction(async (tx) => {
-            const updatedOrder = await tx.order.update({
+        return this.prisma.$transaction(async (tx) => {
+            const updateData: any = { status: dto.status };
+            if (dto.paymentStatus) updateData.paymentStatus = dto.paymentStatus;
+
+            const updated = await tx.order.update({
                 where: { id },
-                data: { status: dto.status },
+                data: updateData,
             });
 
             await tx.orderStatusLog.create({
                 data: { orderId: id, changedBy, status: dto.status },
             });
 
-            return updatedOrder;
+            return updated;
         });
-
-        return {
-            message: 'Data berhasil diubah',
-            data: updated,
-        };
     }
 }

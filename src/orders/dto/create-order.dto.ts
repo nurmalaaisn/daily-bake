@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-    IsArray, IsDateString, IsInt,
+    IsArray, IsDateString, IsEnum, IsInt,
     IsNotEmpty, IsOptional, IsString,
     IsUUID, Min, ValidateNested,
 } from 'class-validator';
+import { PaymentMethod } from '@prisma/client';
 
 export class OrderItemDto {
     @ApiProperty({ example: 'uuid-produk' })
@@ -26,6 +27,25 @@ export class CreateOrderDto {
     @IsNotEmpty()
     @IsString()
     pickupTime: string;
+
+    @ApiProperty({ enum: PaymentMethod, example: 'BANK_TRANSFER' })
+    @IsEnum(PaymentMethod)
+    paymentMethod: PaymentMethod;
+
+    @ApiProperty({ example: 'Budi Santoso' })
+    @IsNotEmpty()
+    @IsString()
+    recipientName: string;
+
+    @ApiProperty({ example: '08123456789' })
+    @IsNotEmpty()
+    @IsString()
+    recipientPhone: string;
+
+    @ApiProperty({ example: 'Jl. Mawar No. 12, Malang' })
+    @IsNotEmpty()
+    @IsString()
+    recipientAddress: string;
 
     @ApiPropertyOptional({ example: 'Tanpa kacang' })
     @IsOptional()

@@ -11,6 +11,8 @@ export class ReportsService {
             totalOrders,
             totalCustomers,
             pendingOrders,
+            confirmedOrders,
+            bakingOrders,
             completedOrders,
             revenue,
             topProducts,
@@ -18,6 +20,8 @@ export class ReportsService {
             this.prisma.order.count(),
             this.prisma.user.count({ where: { role: 'CUSTOMER' } }),
             this.prisma.order.count({ where: { status: OrderStatus.PENDING } }),
+            this.prisma.order.count({ where: { status: OrderStatus.CONFIRMED } }),
+            this.prisma.order.count({ where: { status: OrderStatus.BAKING } }),
             this.prisma.order.count({ where: { status: OrderStatus.COMPLETED } }),
             this.prisma.order.aggregate({
                 where: { status: OrderStatus.COMPLETED },
@@ -31,7 +35,6 @@ export class ReportsService {
             }),
         ]);
 
-        // Ambil detail produk terlaris
         const productIds = topProducts.map((p) => p.productId);
         const products = await this.prisma.product.findMany({
             where: { id: { in: productIds } },
@@ -47,6 +50,8 @@ export class ReportsService {
             totalOrders,
             totalCustomers,
             pendingOrders,
+            confirmedOrders,
+            bakingOrders,
             completedOrders,
             totalRevenue: revenue._sum.totalPrice ?? 0,
             topProducts: topProductsWithDetail,
@@ -79,10 +84,6 @@ export class ReportsService {
             .filter((o) => o.status === OrderStatus.COMPLETED)
             .reduce((sum, o) => sum + Number(o.totalPrice), 0);
 
-        return {
-            totalOrders: orders.length,
-            totalRevenue,
-            orders,
-        };
+        return { totalOrders: orders.length, totalRevenue, orders };
     }
 }
