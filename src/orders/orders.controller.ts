@@ -1,6 +1,7 @@
 import {
     Controller, Get, Post, Patch,
-    Param, Body, Query, UseGuards, Req,
+    Param, Body, Query, UseGuards,
+    Req, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
@@ -47,7 +48,7 @@ export class OrdersController {
     @UseGuards(RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Get detail pesanan' })
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id', ParseIntPipe) id: number) {
         return this.ordersService.findOne(id);
     }
 
@@ -56,7 +57,7 @@ export class OrdersController {
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Update status pesanan — Baker & Admin' })
     updateStatus(
-        @Param('id') id: string,
+        @Param('id', ParseIntPipe) id: number,
         @Req() req: any,
         @Body() dto: UpdateOrderStatusDto,
     ) {

@@ -28,7 +28,7 @@ async function main() {
         },
     });
 
-    console.log('Seed berhasil — Admin & Baker sudah dibuat');
+    console.log('Seed berhasil — Admin id: 1, Baker id: 2');
 }
 
 main()

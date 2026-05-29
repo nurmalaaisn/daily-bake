@@ -35,7 +35,7 @@ enum PaymentStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           Int      @id @default(autoincrement())
   name         String
   email        String   @unique
   password     String
@@ -53,7 +53,7 @@ model User {
 }
 
 model Category {
-  id        String    @id @default(uuid())
+  id        Int       @id @default(autoincrement())
   name      String    @unique
   createdAt DateTime  @default(now())
   products  Product[]
@@ -62,8 +62,8 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  categoryId  String
+  id          Int      @id @default(autoincrement())
+  categoryId  Int
   name        String
   description String?
   price       Decimal  @db.Decimal(12, 2)
@@ -81,8 +81,8 @@ model Product {
 }
 
 model Order {
-  id               String        @id @default(uuid())
-  customerId       String
+  id               Int           @id @default(autoincrement())
+  customerId       Int
   orderCode        String        @unique
   pickupDate       DateTime
   pickupTime       String
@@ -106,9 +106,9 @@ model Order {
 }
 
 model OrderItem {
-  id        String   @id @default(uuid())
-  orderId   String
-  productId String
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  productId Int
   quantity  Int
   price     Decimal  @db.Decimal(12, 2)
   subtotal  Decimal  @db.Decimal(12, 2)
@@ -121,9 +121,9 @@ model OrderItem {
 }
 
 model OrderStatusLog {
-  id        String      @id @default(uuid())
-  orderId   String
-  changedBy String
+  id        Int         @id @default(autoincrement())
+  orderId   Int
+  changedBy Int
   status    OrderStatus
   changedAt DateTime    @default(now())
 
@@ -134,10 +134,10 @@ model OrderStatusLog {
 }
 
 model Review {
-  id         String   @id @default(uuid())
-  orderId    String
-  customerId String
-  productId  String
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  customerId Int
+  productId  Int
   rating     Int
   comment    String?
   createdAt  DateTime @default(now())

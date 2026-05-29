@@ -1,6 +1,6 @@
 import {
     Controller, Get, Post, Patch, Delete,
-    Param, Body, UseGuards,
+    Param, Body, UseGuards, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
@@ -33,7 +33,7 @@ export class CategoriesController {
 
     @Get(':id')
     @ApiOperation({ summary: 'Get detail kategori' })
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id', ParseIntPipe) id: number) {
         return this.categoriesService.findOne(id);
     }
 
@@ -42,7 +42,10 @@ export class CategoriesController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Update kategori' })
-    update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateCategoryDto,
+    ) {
         return this.categoriesService.update(id, dto);
     }
 
@@ -51,7 +54,7 @@ export class CategoriesController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Hapus kategori' })
-    remove(@Param('id') id: string) {
+    remove(@Param('id', ParseIntPipe) id: number) {
         return this.categoriesService.remove(id);
     }
 }

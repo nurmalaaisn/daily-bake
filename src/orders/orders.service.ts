@@ -13,8 +13,8 @@ import { OrderStatus } from '@prisma/client';
 export class OrdersService {
     constructor(private prisma: PrismaService) { }
 
-    async create(customerId: string, dto: CreateOrderDto) {
-        const productIds = dto.items.map((i) => i.productId);
+    async create(customerId: number, dto: CreateOrderDto) {
+        const productIds = dto.items.map((i) => Number(i.productId));
         const products = await this.prisma.product.findMany({
             where: { id: { in: productIds }, isAvailable: true },
         });
@@ -24,7 +24,7 @@ export class OrdersService {
         }
 
         for (const item of dto.items) {
-            const product = products.find((p) => p.id === item.productId);
+            const product = products.find((p) => p.id === Number(item.productId));
             if (!product) throw new BadRequestException('Produk tidak ditemukan');
             if (product.stock < item.quantity) {
                 throw new BadRequestException(
@@ -35,11 +35,16 @@ export class OrdersService {
 
         let totalPrice = 0;
         const orderItems = dto.items.map((item) => {
-            const product = products.find((p) => p.id === item.productId)!;
+            const product = products.find((p) => p.id === Number(item.productId))!;
             const price = Number(product.price);
             const subtotal = price * item.quantity;
             totalPrice += subtotal;
-            return { productId: item.productId, quantity: item.quantity, price, subtotal };
+            return {
+                productId: Number(item.productId),
+                quantity: item.quantity,
+                price,
+                subtotal,
+            };
         });
 
         const orderCode = `DB-${Date.now()}`;
@@ -75,7 +80,7 @@ export class OrdersService {
 
             for (const item of dto.items) {
                 await tx.product.update({
-                    where: { id: item.productId },
+                    where: { id: Number(item.productId) },
                     data: { stock: { decrement: item.quantity } },
                 });
             }
@@ -86,7 +91,7 @@ export class OrdersService {
         return order;
     }
 
-    async findMyOrders(customerId: string) {
+    async findMyOrders(customerId: number) {
         return this.prisma.order.findMany({
             where: { customerId },
             include: {
@@ -100,7 +105,7 @@ export class OrdersService {
 
     async findAll(query: QueryOrderDto) {
         const { status, startDate, endDate, page = 1, limit = 10 } = query;
-        const skip = (page - 1) * limit;
+        const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {};
         if (status) where.status = status;
@@ -118,7 +123,7 @@ export class OrdersService {
                     orderItems: { include: { product: true } },
                 },
                 skip,
-                take: limit,
+                take: Number(limit),
                 orderBy: { createdAt: 'desc' },
             }),
             this.prisma.order.count({ where }),
@@ -126,18 +131,25 @@ export class OrdersService {
 
         return {
             data,
-            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+            meta: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         };
     }
 
-    async findOne(id: string) {
+    async findOne(id: number) {
         const order = await this.prisma.order.findUnique({
             where: { id },
             include: {
                 customer: { select: { id: true, name: true, email: true } },
                 orderItems: { include: { product: true } },
                 statusLogs: {
-                    include: { user: { select: { id: true, name: true, role: true } } },
+                    include: {
+                        user: { select: { id: true, name: true, role: true } },
+                    },
                     orderBy: { changedAt: 'asc' },
                 },
                 reviews: {
@@ -149,7 +161,7 @@ export class OrdersService {
         return order;
     }
 
-    async updateStatus(id: string, changedBy: string, dto: UpdateOrderStatusDto) {
+    async updateStatus(id: number, changedBy: number, dto: UpdateOrderStatusDto) {
         const order = await this.findOne(id);
 
         const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {

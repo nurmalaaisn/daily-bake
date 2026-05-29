@@ -3,14 +3,15 @@ import { Type } from 'class-transformer';
 import {
     IsArray, IsDateString, IsEnum, IsInt,
     IsNotEmpty, IsOptional, IsString,
-    IsUUID, Min, ValidateNested,
+    Min, ValidateNested,
 } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 
 export class OrderItemDto {
-    @ApiProperty({ example: 'uuid-produk' })
-    @IsUUID()
-    productId: string;
+    @ApiProperty({ example: 1 })
+    @IsInt()
+    @Type(() => Number)
+    productId: number;
 
     @ApiProperty({ example: 2 })
     @IsInt()

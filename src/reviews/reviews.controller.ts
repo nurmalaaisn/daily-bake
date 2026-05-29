@@ -1,6 +1,7 @@
 import {
     Controller, Get, Post, Delete,
-    Param, Body, Query, UseGuards, Req,
+    Param, Body, Query, UseGuards,
+    Req, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
@@ -20,20 +21,20 @@ export class ReviewsController {
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.CUSTOMER)
-    @ApiOperation({ summary: 'Buat review produk — hanya order yang sudah COMPLETED' })
+    @ApiOperation({ summary: 'Buat review — hanya order COMPLETED' })
     create(@Req() req: any, @Body() dto: CreateReviewDto) {
         return this.reviewsService.create(req.user.id, dto);
     }
 
     @Get()
-    @ApiOperation({ summary: 'Get semua review — bisa filter by productId atau customerId' })
+    @ApiOperation({ summary: 'Get semua review — public' })
     findAll(@Query() query: QueryReviewDto) {
         return this.reviewsService.findAll(query);
     }
 
     @Get(':id')
     @ApiOperation({ summary: 'Get detail review' })
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id', ParseIntPipe) id: number) {
         return this.reviewsService.findOne(id);
     }
 
@@ -41,7 +42,7 @@ export class ReviewsController {
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard)
     @ApiOperation({ summary: 'Hapus review — pemilik atau Admin' })
-    remove(@Param('id') id: string, @Req() req: any) {
+    remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
         return this.reviewsService.remove(id, req.user.id, req.user.role);
     }
 }

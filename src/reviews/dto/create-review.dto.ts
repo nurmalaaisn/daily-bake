@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateReviewDto {
-    @ApiProperty({ example: 'uuid-order' })
-    @IsUUID()
-    orderId: string;
+    @ApiProperty({ example: 1 })
+    @IsInt()
+    @Type(() => Number)
+    orderId: number;
 
-    @ApiProperty({ example: 'uuid-produk' })
-    @IsUUID()
-    productId: string;
+    @ApiProperty({ example: 1 })
+    @IsInt()
+    @Type(() => Number)
+    productId: number;
 
     @ApiProperty({ example: 5, minimum: 1, maximum: 5 })
     @IsInt()

@@ -1,8 +1,4 @@
-import {
-    Injectable,
-    NotFoundException,
-    BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -23,7 +19,7 @@ export class UsersService {
         });
     }
 
-    async findOne(id: string) {
+    async findOne(id: number) {
         const user = await this.prisma.user.findUnique({
             where: { id },
             select: {
@@ -33,32 +29,17 @@ export class UsersService {
                 phone: true,
                 role: true,
                 createdAt: true,
-                updatedAt: true,
             },
         });
-
-        // Dipakai juga oleh update & delete — pesan seragam
-        if (!user) throw new NotFoundException('Data tidak tersedia');
+        if (!user) throw new NotFoundException('User tidak ditemukan');
         return user;
     }
 
-    async update(id: string, dto: UpdateUserDto) {
-        // Kalau user tidak ada / sudah dihapus → "Data tidak tersedia"
+    async update(id: number, dto: UpdateUserDto) {
         await this.findOne(id);
-
-        // Kalau ada perubahan email, cek duplikat
-        if (dto.name) {
-            const existing = await this.prisma.user.findFirst({
-                where: { name: dto.name, NOT: { id } },
-            });
-            if (existing) {
-                throw new BadRequestException('Maaf, data sudah tersedia');
-            }
-        }
-
-        const updated = await this.prisma.user.update({
+        return this.prisma.user.update({
             where: { id },
-            data: { ...dto, updatedAt: new Date() },
+            data: dto,
             select: {
                 id: true,
                 name: true,
@@ -68,17 +49,11 @@ export class UsersService {
                 updatedAt: true,
             },
         });
-
-        return {
-            message: 'Data berhasil diubah',
-            data: updated,
-        };
     }
 
-    async remove(id: string) {
-        // Kalau sudah dihapus sebelumnya → findOne akan lempar "Data tidak tersedia"
+    async remove(id: number) {
         await this.findOne(id);
         await this.prisma.user.delete({ where: { id } });
-        return { message: 'Data berhasil dihapus' };
+        return { message: 'User berhasil dihapus' };
     }
 }

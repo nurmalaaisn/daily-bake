@@ -34,7 +34,7 @@ export class ProductsService {
                 { description: { contains: search, mode: 'insensitive' } },
             ];
         }
-        if (categoryId) where.categoryId = categoryId;
+        if (categoryId) where.categoryId = Number(categoryId);
 
         const orderBy: any = { [sortBy]: sortOrder };
 
@@ -46,13 +46,12 @@ export class ProductsService {
                     _count: { select: { reviews: true } },
                 },
                 skip,
-                take: limit,
+                take: Number(limit),
                 orderBy,
             }),
             this.prisma.product.count({ where }),
         ]);
 
-        // Hitung rata-rata rating tiap produk
         const productIds = data.map((p) => p.id);
         const ratings = await this.prisma.review.groupBy({
             by: ['productId'],
@@ -64,9 +63,10 @@ export class ProductsService {
             const ratingData = ratings.find((r) => r.productId === product.id);
             return {
                 ...product,
-                averageRating: ratingData?._avg.rating
-                    ? Number(ratingData._avg.rating.toFixed(1))
-                    : null,
+                averageRating:
+                    ratingData?._avg?.rating != null
+                        ? Number(ratingData._avg.rating.toFixed(1))
+                        : null,
             };
         });
 
@@ -74,14 +74,14 @@ export class ProductsService {
             data: dataWithRating,
             meta: {
                 total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
             },
         };
     }
 
-    async findOne(id: string) {
+    async findOne(id: number) {
         const product = await this.prisma.product.findUnique({
             where: { id },
             include: {
@@ -104,13 +104,14 @@ export class ProductsService {
 
         return {
             ...product,
-            averageRating: ratingAgg._avg.rating
-                ? Number(ratingAgg._avg.rating.toFixed(1))
-                : null,
+            averageRating:
+                ratingAgg._avg?.rating != null
+                    ? Number(ratingAgg._avg.rating.toFixed(1))
+                    : null,
         };
     }
 
-    async update(id: string, dto: UpdateProductDto, imageUrl?: string) {
+    async update(id: number, dto: UpdateProductDto, imageUrl?: string) {
         await this.findOne(id);
         const data: any = { ...dto };
         if (imageUrl) data.image = imageUrl;
@@ -122,7 +123,7 @@ export class ProductsService {
         });
     }
 
-    async remove(id: string) {
+    async remove(id: number) {
         await this.findOne(id);
         await this.prisma.product.delete({ where: { id } });
         return { message: 'Produk berhasil dihapus' };

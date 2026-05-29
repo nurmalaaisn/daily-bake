@@ -1,7 +1,7 @@
 import {
     Controller, Get, Post, Patch, Delete,
     Param, Body, Query, UseGuards,
-    UseInterceptors, UploadedFile,
+    UseInterceptors, UploadedFile, ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -39,7 +39,7 @@ export class ProductsController {
     @UseInterceptors(FileInterceptor('image', { storage }))
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: CreateProductDto })
-    @ApiOperation({ summary: 'Buat produk baru (dengan upload gambar)' })
+    @ApiOperation({ summary: 'Buat produk baru' })
     create(
         @Body() dto: CreateProductDto,
         @UploadedFile() file?: Express.Multer.File,
@@ -49,14 +49,14 @@ export class ProductsController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Get semua produk — public, support search & filter' })
+    @ApiOperation({ summary: 'Get semua produk — public' })
     findAll(@Query() query: QueryProductDto) {
         return this.productsService.findAll(query);
     }
 
     @Get(':id')
     @ApiOperation({ summary: 'Get detail produk' })
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id', ParseIntPipe) id: number) {
         return this.productsService.findOne(id);
     }
 
@@ -69,7 +69,7 @@ export class ProductsController {
     @ApiBody({ type: UpdateProductDto })
     @ApiOperation({ summary: 'Update produk' })
     update(
-        @Param('id') id: string,
+        @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateProductDto,
         @UploadedFile() file?: Express.Multer.File,
     ) {
@@ -82,7 +82,7 @@ export class ProductsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Hapus produk' })
-    remove(@Param('id') id: string) {
+    remove(@Param('id', ParseIntPipe) id: number) {
         return this.productsService.remove(id);
     }
 }

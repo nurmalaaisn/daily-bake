@@ -1,6 +1,6 @@
 import {
     Controller, Get, Patch, Delete,
-    Param, Body, UseGuards,
+    Param, Body, UseGuards, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -27,21 +27,24 @@ export class UsersController {
     @Get(':id')
     @Roles(Role.ADMIN)
     @ApiOperation({ summary: 'Get detail user' })
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id', ParseIntPipe) id: number) {
         return this.usersService.findOne(id);
     }
 
     @Patch(':id')
     @Roles(Role.ADMIN)
     @ApiOperation({ summary: 'Update user' })
-    update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateUserDto,
+    ) {
         return this.usersService.update(id, dto);
     }
 
     @Delete(':id')
     @Roles(Role.ADMIN)
     @ApiOperation({ summary: 'Hapus user' })
-    remove(@Param('id') id: string) {
+    remove(@Param('id', ParseIntPipe) id: number) {
         return this.usersService.remove(id);
     }
 }

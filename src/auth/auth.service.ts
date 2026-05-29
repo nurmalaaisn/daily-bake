@@ -49,7 +49,7 @@ export class AuthService {
         return tokens;
     }
 
-    async refresh(userId: string, refreshToken: string) {
+    async refresh(userId: number, refreshToken: string) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user?.refreshToken) throw new ForbiddenException('Akses ditolak');
 
@@ -61,7 +61,7 @@ export class AuthService {
         return tokens;
     }
 
-    async logout(userId: string) {
+    async logout(userId: number) {
         await this.prisma.user.update({
             where: { id: userId },
             data: { refreshToken: null },
@@ -69,7 +69,7 @@ export class AuthService {
         return { message: 'Logout berhasil' };
     }
 
-    private async generateTokens(userId: string, email: string, role: string) {
+    private async generateTokens(userId: number, email: string, role: string) {
         const payload = { sub: userId, email, role };
         const [accessToken, refreshToken] = await Promise.all([
             this.jwt.signAsync(payload, {
@@ -84,7 +84,7 @@ export class AuthService {
         return { accessToken, refreshToken };
     }
 
-    private async saveRefreshToken(userId: string, token: string) {
+    private async saveRefreshToken(userId: number, token: string) {
         const hashed = await bcrypt.hash(token, 10);
         await this.prisma.user.update({
             where: { id: userId },

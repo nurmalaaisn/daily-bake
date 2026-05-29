@@ -13,39 +13,32 @@ import { OrderStatus } from '@prisma/client';
 export class ReviewsService {
     constructor(private prisma: PrismaService) { }
 
-    async create(customerId: string, dto: CreateReviewDto) {
-        // Validasi order milik customer dan sudah COMPLETED
+    async create(customerId: number, dto: CreateReviewDto) {
         const order = await this.prisma.order.findFirst({
             where: {
-                id: dto.orderId,
+                id: Number(dto.orderId),
                 customerId,
                 status: OrderStatus.COMPLETED,
             },
-            include: {
-                orderItems: true,
-            },
+            include: { orderItems: true },
         });
 
         if (!order) {
-            throw new NotFoundException(
-                'Order tidak ditemukan atau belum selesai',
-            );
+            throw new NotFoundException('Order tidak ditemukan atau belum selesai');
         }
 
-        // Validasi produk ada di dalam order
         const itemExists = order.orderItems.some(
-            (item) => item.productId === dto.productId,
+            (item) => item.productId === Number(dto.productId),
         );
         if (!itemExists) {
             throw new BadRequestException('Produk tidak ada dalam order ini');
         }
 
-        // Cek apakah sudah pernah review produk yang sama di order yang sama
         const existing = await this.prisma.review.findUnique({
             where: {
                 orderId_productId: {
-                    orderId: dto.orderId,
-                    productId: dto.productId,
+                    orderId: Number(dto.orderId),
+                    productId: Number(dto.productId),
                 },
             },
         });
@@ -55,9 +48,9 @@ export class ReviewsService {
 
         return this.prisma.review.create({
             data: {
-                orderId: dto.orderId,
+                orderId: Number(dto.orderId),
                 customerId,
-                productId: dto.productId,
+                productId: Number(dto.productId),
                 rating: dto.rating,
                 comment: dto.comment,
             },
@@ -70,11 +63,11 @@ export class ReviewsService {
 
     async findAll(query: QueryReviewDto) {
         const { productId, customerId, page = 1, limit = 10 } = query;
-        const skip = (page - 1) * limit;
+        const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {};
-        if (productId) where.productId = productId;
-        if (customerId) where.customerId = customerId;
+        if (productId) where.productId = Number(productId);
+        if (customerId) where.customerId = Number(customerId);
 
         const [data, total] = await Promise.all([
             this.prisma.review.findMany({
@@ -84,33 +77,38 @@ export class ReviewsService {
                     product: { select: { id: true, name: true } },
                 },
                 skip,
-                take: limit,
+                take: Number(limit),
                 orderBy: { createdAt: 'desc' },
             }),
             this.prisma.review.count({ where }),
         ]);
 
-        // Hitung rata-rata rating kalau filter by product
         let averageRating: number | null = null;
         if (productId) {
             const agg = await this.prisma.review.aggregate({
-                where: { productId },
+                where: { productId: Number(productId) },
                 _avg: { rating: true },
                 _count: { rating: true },
             });
-            averageRating = agg._avg.rating
-                ? Number(agg._avg.rating.toFixed(1))
-                : null;
+            averageRating =
+                agg._avg?.rating != null
+                    ? Number(agg._avg.rating.toFixed(1))
+                    : null;
         }
 
         return {
             data,
             averageRating,
-            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+            meta: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         };
     }
 
-    async findOne(id: string) {
+    async findOne(id: number) {
         const review = await this.prisma.review.findUnique({
             where: { id },
             include: {
@@ -122,12 +120,13 @@ export class ReviewsService {
         return review;
     }
 
-    async remove(id: string, customerId: string, role: string) {
+    async remove(id: number, customerId: number, role: string) {
         const review = await this.findOne(id);
 
-        // Hanya pemilik review atau admin yang bisa hapus
         if (review.customerId !== customerId && role !== 'ADMIN') {
-            throw new BadRequestException('Tidak punya akses untuk menghapus review ini');
+            throw new BadRequestException(
+                'Tidak punya akses untuk menghapus review ini',
+            );
         }
 
         await this.prisma.review.delete({ where: { id } });
