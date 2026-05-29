@@ -38,7 +38,24 @@ export class ProductsController {
     @Roles(Role.BAKER, Role.ADMIN)
     @UseInterceptors(FileInterceptor('image', { storage }))
     @ApiConsumes('multipart/form-data')
-    @ApiBody({ type: CreateProductDto })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' },
+                description: { type: 'string' },
+                price: { type: 'number' },
+                stock: { type: 'number' },
+                categoryId: { type: 'number' },
+                isAvailable: { type: 'boolean' },
+                image: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+            required: ['name', 'price', 'stock', 'categoryId'],
+        },
+    })
     @ApiOperation({ summary: 'Buat produk baru' })
     create(
         @Body() dto: CreateProductDto,
@@ -66,7 +83,23 @@ export class ProductsController {
     @Roles(Role.BAKER, Role.ADMIN)
     @UseInterceptors(FileInterceptor('image', { storage }))
     @ApiConsumes('multipart/form-data')
-    @ApiBody({ type: UpdateProductDto })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' },
+                description: { type: 'string' },
+                price: { type: 'number' },
+                stock: { type: 'number' },
+                categoryId: { type: 'number' },
+                isAvailable: { type: 'boolean' },
+                image: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
     @ApiOperation({ summary: 'Update produk' })
     update(
         @Param('id', ParseIntPipe) id: number,
