@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -25,12 +25,26 @@ export class CloudinaryService {
                         { fetch_format: 'auto' },
                     ],
                 },
-                (error, result: UploadApiResponse) => {
+                (error, result) => {
                     if (error) {
-                        reject(new BadRequestException(`Upload gagal: ${error.message}`));
-                    } else {
-                        resolve(result.secure_url);
+                        reject(
+                            new BadRequestException(
+                                `Upload gagal: ${error.message}`,
+                            ),
+                        );
+                        return;
                     }
+
+                    if (!result) {
+                        reject(
+                            new BadRequestException(
+                                'Upload gagal: hasil upload kosong',
+                            ),
+                        );
+                        return;
+                    }
+
+                    resolve(result.secure_url);
                 },
             );
 
@@ -41,21 +55,25 @@ export class CloudinaryService {
 
     async deleteFile(imageUrl: string): Promise<void> {
         try {
-            // Ambil public_id dari URL Cloudinary
-            // Format URL: https://res.cloudinary.com/cloud-name/image/upload/v123/dailybake/products/filename.jpg
             const urlParts = imageUrl.split('/');
             const uploadIndex = urlParts.indexOf('upload');
+
             if (uploadIndex === -1) return;
 
-            // Ambil bagian setelah "upload/vXXXXXX/"
-            const pathWithVersion = urlParts.slice(uploadIndex + 1).join('/');
-            // Hapus versi (vXXXXXX/) jika ada
-            const publicId = pathWithVersion.replace(/^v\d+\//, '').replace(/\.[^/.]+$/, '');
+            const pathWithVersion = urlParts
+                .slice(uploadIndex + 1)
+                .join('/');
+
+            const publicId = pathWithVersion
+                .replace(/^v\d+\//, '')
+                .replace(/\.[^/.]+$/, '');
 
             await cloudinary.uploader.destroy(publicId);
         } catch {
-            // Jika hapus gagal, tidak perlu throw error — lanjutkan proses
-            console.warn('Gagal menghapus file dari Cloudinary:', imageUrl);
+            console.warn(
+                'Gagal menghapus file dari Cloudinary:',
+                imageUrl,
+            );
         }
     }
 }
