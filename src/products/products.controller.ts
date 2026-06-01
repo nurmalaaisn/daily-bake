@@ -1,67 +1,79 @@
 import {
-    Controller, Get, Post, Patch, Delete,
-    Param, Body, Query, UseGuards,
-    UseInterceptors, UploadedFile, ParseIntPipe,
+    Controller,
+    Get,
+    Post,
+    Patch,
+    Delete,
+    Param,
+    Body,
+    Query,
+    UseGuards,
+    UseInterceptors,
+    UploadedFile,
+    ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import {
-    ApiTags, ApiOperation, ApiBearerAuth,
-    ApiConsumes, ApiBody,
+    ApiTags,
+    ApiOperation,
+    ApiBearerAuth,
+    ApiConsumes,
+    ApiBody,
 } from '@nestjs/swagger';
+
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
+
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+
 import { Role } from '@prisma/client';
 
-const storage = diskStorage({
-    destination: './uploads',
-    filename: (_, file, cb) => {
-        const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `product-${unique}${extname(file.originalname)}`);
-    },
-});
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
+
+import {
+    imageFileFilter,
+    maxFileSize,
+} from '../common/utils/file-filter.util';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-    constructor(private productsService: ProductsService) { }
+    constructor(
+        private productsService: ProductsService,
+        private cloudinaryService: CloudinaryService,
+    ) { }
 
     @Post()
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
-    @UseInterceptors(FileInterceptor('image', { storage }))
-    @ApiConsumes('multipart/form-data')
-    @ApiBody({
-        schema: {
-            type: 'object',
-            properties: {
-                name: { type: 'string' },
-                description: { type: 'string' },
-                price: { type: 'number' },
-                stock: { type: 'number' },
-                categoryId: { type: 'number' },
-                isAvailable: { type: 'boolean' },
-                image: {
-                    type: 'string',
-                    format: 'binary',
-                },
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: memoryStorage(),
+            fileFilter: imageFileFilter,
+            limits: {
+                fileSize: maxFileSize,
             },
-            required: ['name', 'price', 'stock', 'categoryId'],
-        },
-    })
+        }),
+    )
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: CreateProductDto })
     @ApiOperation({ summary: 'Buat produk baru' })
-    create(
+    async create(
         @Body() dto: CreateProductDto,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        const imageUrl = file ? `/uploads/${file.filename}` : undefined;
+        let imageUrl: string | undefined;
+
+        if (file) {
+            imageUrl = await this.cloudinaryService.uploadFile(file);
+        }
+
         return this.productsService.create(dto, imageUrl);
     }
 
@@ -81,32 +93,35 @@ export class ProductsController {
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
-    @UseInterceptors(FileInterceptor('image', { storage }))
-    @ApiConsumes('multipart/form-data')
-    @ApiBody({
-        schema: {
-            type: 'object',
-            properties: {
-                name: { type: 'string' },
-                description: { type: 'string' },
-                price: { type: 'number' },
-                stock: { type: 'number' },
-                categoryId: { type: 'number' },
-                isAvailable: { type: 'boolean' },
-                image: {
-                    type: 'string',
-                    format: 'binary',
-                },
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: memoryStorage(),
+            fileFilter: imageFileFilter,
+            limits: {
+                fileSize: maxFileSize,
             },
-        },
-    })
+        }),
+    )
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: UpdateProductDto })
     @ApiOperation({ summary: 'Update produk' })
-    update(
+    async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateProductDto,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        const imageUrl = file ? `/uploads/${file.filename}` : undefined;
+        let imageUrl: string | undefined;
+
+        if (file) {
+            const existing = await this.productsService.findOne(id);
+
+            if (existing.image) {
+                await this.cloudinaryService.deleteFile(existing.image);
+            }
+
+            imageUrl = await this.cloudinaryService.uploadFile(file);
+        }
+
         return this.productsService.update(id, dto, imageUrl);
     }
 
@@ -115,7 +130,13 @@ export class ProductsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.BAKER, Role.ADMIN)
     @ApiOperation({ summary: 'Hapus produk' })
-    remove(@Param('id', ParseIntPipe) id: number) {
+    async remove(@Param('id', ParseIntPipe) id: number) {
+        const existing = await this.productsService.findOne(id);
+
+        if (existing.image) {
+            await this.cloudinaryService.deleteFile(existing.image);
+        }
+
         return this.productsService.remove(id);
     }
 }

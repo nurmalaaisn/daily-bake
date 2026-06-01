@@ -4,7 +4,7 @@ import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 
 @Module({
-    imports: [MulterModule.register({ dest: './uploads' })],
+    imports: [MulterModule.register({})],
     controllers: [ProductsController],
     providers: [ProductsService],
 })
