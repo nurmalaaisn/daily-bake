@@ -1,6 +1,6 @@
 import {
     Controller, Get, Patch, Delete,
-    Param, Body, UseGuards, ParseIntPipe,
+    Param, Body, UseGuards, ParseIntPipe, Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -44,7 +44,7 @@ export class UsersController {
     @Delete(':id')
     @Roles(Role.ADMIN)
     @ApiOperation({ summary: 'Hapus user' })
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.usersService.remove(id);
+    remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+        return this.usersService.remove(id, req.user.id);
     }
 }
