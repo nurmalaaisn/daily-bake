@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,8 +12,17 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) => {
+        const messages = errors.map((err) =>
+          Object.values(err.constraints || {}).join(', '),
+        );
+        const { BadRequestException } = require('@nestjs/common');
+        return new BadRequestException(messages);
+      },
     }),
   );
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   app.enableCors();
 
