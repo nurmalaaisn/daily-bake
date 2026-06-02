@@ -1,8 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
+import {
+    IsNotEmpty,
+    IsString,
+    IsEnum,
+    IsOptional,
+    MaxLength,
+    Matches
+} from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 
-export class CreateOrderDto {
+export class CheckoutOrderDto {
     @ApiProperty({ example: '2026-06-15', description: 'Tanggal penjemputan kue (YYYY-MM-DD)' })
     @IsNotEmpty()
     @IsString()
@@ -32,12 +39,12 @@ export class CreateOrderDto {
     @Matches(/^08\d{8,11}$/, { message: 'Nomor telepon harus diawali 08 dan berjumlah 10-13 digit' })
     recipientPhone!: string;
 
-    @ApiProperty({ example: 'Jl. Danau Toba No. 45, Malang', description: 'Alamat lengkap penerima' })
+    @ApiProperty({ example: 'Jl. Danau Toba No. 45, Malang', description: 'Alamat penjemputan / detail pengantaran' })
     @IsNotEmpty()
     @IsString()
     recipientAddress!: string;
 
-    @ApiPropertyOptional({ example: 'Tolong beri lilin angka 5 ya.', maxLength: 500 })
+    @ApiPropertyOptional({ example: 'Tolong tulis ucapan Happy Birthday di atas kuenya ya.', maxLength: 500 })
     @IsOptional()
     @IsString()
     @MaxLength(500, { message: 'Notes maksimal 500 karakter' })

@@ -48,6 +48,7 @@ model User {
   orders     Order[]
   statusLogs OrderStatusLog[]
   reviews    Review[]
+  cart       Cart?
 
   @@map("users")
 }
@@ -76,6 +77,7 @@ model Product {
   category   Category    @relation(fields: [categoryId], references: [id])
   orderItems OrderItem[]
   reviews    Review[]
+  cartItems  CartItem[]
 
   @@map("products")
 }
@@ -149,4 +151,30 @@ model Review {
 
   @@unique([orderId, productId])
   @@map("reviews")
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartItems CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        Int @id @default(autoincrement())
+  cartId    Int
+  productId Int
+  quantity  Int
+
+  cart    Cart    @relation(fields: [cartId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  // BARIS INI WAJIB ADA agar 'cartId_productId' bisa dipakai di Service
+  @@unique([cartId, productId])
+  @@map("cart_items")
 }

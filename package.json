@@ -21,7 +21,7 @@
     "@nestjs/platform-express": "^11.1.23",
     "@nestjs/serve-static": "^5.0.5",
     "@nestjs/swagger": "^11.4.3",
-    "@prisma/client": "^6.9.0",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

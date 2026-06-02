@@ -2,144 +2,110 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
-    ForbiddenException,
     InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class OrdersService {
     constructor(private prisma: PrismaService) { }
 
-    async create(customerId: number, dto: CreateOrderDto) {
-        if (!dto.items || dto.items.length === 0) {
-            throw new BadRequestException(
-                'Pesanan harus memiliki minimal 1 produk',
-            );
+    async checkout(customerId: number, dto: CreateOrderDto) {
+        // 1. Validasi Jam Operasional (08:00 - 20:00)
+        const [pickupHour, pickupMinute] = dto.pickupTime.split(':').map(Number);
+        if (pickupHour < 8 || pickupHour > 20 || (pickupHour === 20 && pickupMinute > 0)) {
+            throw new BadRequestException('Jam pickup di luar jam operasional (08:00 - 20:00)');
         }
 
-        if (dto.items.length > 20) {
-            throw new BadRequestException(
-                'Maksimal 20 produk dalam satu pesanan',
-            );
-        }
-
+        // 2. Validasi Tanggal & Waktu (Tidak boleh masa lalu)
         const pickupDate = new Date(dto.pickupDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         if (isNaN(pickupDate.getTime())) {
             throw new BadRequestException('Format tanggal pickup tidak valid');
         }
 
         if (pickupDate < today) {
-            throw new BadRequestException(
-                'Tanggal pickup tidak boleh di masa lalu',
-            );
+            throw new BadRequestException('Tanggal pickup tidak boleh masa lalu');
         }
 
-        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(dto.pickupTime)) {
-            throw new BadRequestException(
-                'Format waktu pickup tidak valid, gunakan format HH:MM (contoh: 14:30)',
-            );
+        // Jika hari ini, periksa apakah jam penjemputan sudah lewat
+        if (pickupDate.getTime() === today.getTime()) {
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            if (pickupHour < currentHour || (pickupHour === currentHour && pickupMinute < currentMinute)) {
+                throw new BadRequestException('Jam pickup tidak boleh lebih kecil dari waktu sekarang');
+            }
         }
 
-        const validPaymentMethods = ['BANK_TRANSFER', 'E_WALLET', 'COD'];
-        if (!validPaymentMethods.includes(dto.paymentMethod)) {
-            throw new BadRequestException(
-                `Metode pembayaran tidak valid. Pilihan: ${validPaymentMethods.join(', ')}`,
-            );
-        }
-
-        if (!dto.recipientName || dto.recipientName.trim() === '') {
-            throw new BadRequestException('Nama penerima wajib diisi');
-        }
-
-        if (!dto.recipientPhone || dto.recipientPhone.trim() === '') {
-            throw new BadRequestException('Nomor HP penerima wajib diisi');
-        }
-
-        if (!dto.recipientAddress || dto.recipientAddress.trim() === '') {
-            throw new BadRequestException('Alamat penerima wajib diisi');
-        }
-
-        // Cek duplikat produk dalam satu order
-        const productIds = dto.items.map((i) => Number(i.productId));
-        const uniqueProductIds = [...new Set(productIds)];
-        if (uniqueProductIds.length !== productIds.length) {
-            throw new BadRequestException(
-                'Terdapat produk yang sama dalam pesanan. Gabungkan quantity produk yang sama',
-            );
-        }
-
-        // Validasi semua produk
-        const products = await this.prisma.product.findMany({
-            where: { id: { in: productIds } },
+        // 3. Ambil Keranjang Belanja (Cart) Customer
+        const cart = await this.prisma.cart.findUnique({
+            where: { userId: customerId },
+            include: {
+                cartItems: {
+                    include: { product: true },
+                },
+            },
         });
 
-        for (const item of dto.items) {
-            const product = products.find((p) => p.id === Number(item.productId));
-
-            if (!product) {
-                throw new NotFoundException(
-                    `Produk dengan id ${item.productId} tidak ditemukan`,
-                );
-            }
-
-            if (!product.isAvailable) {
-                throw new BadRequestException(
-                    `Produk "${product.name}" sedang tidak tersedia`,
-                );
-            }
-
-            if (product.stock === 0) {
-                throw new BadRequestException(
-                    `Produk "${product.name}" sedang habis`,
-                );
-            }
-
-            if (product.stock < item.quantity) {
-                throw new BadRequestException(
-                    `Stok produk "${product.name}" tidak mencukupi. Stok tersedia: ${product.stock}`,
-                );
-            }
-
-            if (item.quantity < 1) {
-                throw new BadRequestException(
-                    `Quantity produk "${product.name}" minimal 1`,
-                );
-            }
-
-            if (item.quantity > 100) {
-                throw new BadRequestException(
-                    `Quantity produk "${product.name}" maksimal 100 per pesanan`,
-                );
-            }
+        if (!cart || cart.cartItems.length === 0) {
+            throw new BadRequestException('Keranjang belanja kamu masih kosong');
         }
 
-        let totalPrice = 0;
-        const orderItems = dto.items.map((item) => {
-            const product = products.find((p) => p.id === Number(item.productId))!;
-            const price = Number(product.price);
-            const subtotal = price * item.quantity;
-            totalPrice += subtotal;
-            return {
-                productId: Number(item.productId),
-                quantity: item.quantity,
-                price,
-                subtotal,
-            };
-        });
-
-        const orderCode = `DB-${Date.now()}`;
-
+        // 4. Proses Checkout dalam Blok Database Transaction (Aman dari Race Condition)
         try {
-            const order = await this.prisma.$transaction(async (tx) => {
+            const resultOrder = await this.prisma.$transaction(async (tx) => {
+                let totalPrice = 0;
+
+                // Memakai tipe data input dari struktur prisma yang valid tanpa field id otomatis
+                const orderItemsData: Prisma.OrderItemCreateWithoutOrderInput[] = [];
+
+                for (const item of cart.cartItems) {
+                    // Validasi Dasar Ketersediaan Produk
+                    if (!item.product.isAvailable) {
+                        throw new BadRequestException(`Produk "${item.product.name}" sedang tidak tersedia`);
+                    }
+
+                    if (item.product.stock <= 0) {
+                        throw new BadRequestException(`Stok produk "${item.product.name}" habis`);
+                    }
+
+                    // PERBAIKAN RAW SQL: Nama tabel asli kamu di DB PostgreSQL adalah "products" (bukan "Product")
+                    const affectedRows = await tx.$executeRaw`
+            UPDATE products 
+            SET stock = stock - ${item.quantity} 
+            WHERE id = ${item.productId} AND stock >= ${item.quantity}
+          `;
+
+                    if (affectedRows === 0) {
+                        throw new BadRequestException(`Stok produk "${item.product.name}" tidak mencukupi atau baru saja berubah`);
+                    }
+
+                    const price = Number(item.product.price);
+                    const subtotal = price * item.quantity;
+                    totalPrice += subtotal;
+
+                    // PERBAIKAN STRUKTUR PUSH: Hubungkan menggunakan skema relasi prisma objek product
+                    orderItemsData.push({
+                        quantity: item.quantity,
+                        price,
+                        subtotal,
+                        product: {
+                            connect: { id: item.productId }
+                        }
+                    });
+                }
+
+                // Pembuatan Kode Unik Pesanan (Format: DB-YYYYMMDD-Timestamp)
+                const dateString = dto.pickupDate.replace(/-/g, '');
+                const orderCode = `DB-${dateString}-${Date.now().toString().slice(-6)}`;
+
+                // Buat data Order baru beserta OrderItems
                 const newOrder = await tx.order.create({
                     data: {
                         customerId,
@@ -148,11 +114,15 @@ export class OrdersService {
                         pickupTime: dto.pickupTime,
                         totalPrice,
                         paymentMethod: dto.paymentMethod,
+                        paymentStatus: PaymentStatus.UNPAID,
+                        status: OrderStatus.PENDING,
                         notes: dto.notes,
                         recipientName: dto.recipientName,
                         recipientPhone: dto.recipientPhone,
                         recipientAddress: dto.recipientAddress,
-                        orderItems: { create: orderItems },
+                        orderItems: {
+                            create: orderItemsData,
+                        },
                     },
                     include: {
                         orderItems: { include: { product: true } },
@@ -160,6 +130,7 @@ export class OrdersService {
                     },
                 });
 
+                // Catat Log Status Pertama (PENDING)
                 await tx.orderStatusLog.create({
                     data: {
                         orderId: newOrder.id,
@@ -168,27 +139,25 @@ export class OrdersService {
                     },
                 });
 
-                for (const item of dto.items) {
-                    await tx.product.update({
-                        where: { id: Number(item.productId) },
-                        data: { stock: { decrement: item.quantity } },
-                    });
-                }
+                // Kosongkan Keranjang Belanja Customer setelah sukses dibeli
+                await tx.cartItem.deleteMany({
+                    where: { cartId: cart.id },
+                });
 
                 return newOrder;
             });
 
             return {
-                message: 'Pesanan berhasil dibuat',
-                data: order,
+                message: 'Checkout berhasil, pesanan Anda telah dibuat',
+                data: resultOrder,
             };
+
         } catch (error) {
-            if (
-                error instanceof BadRequestException ||
-                error instanceof NotFoundException
-            ) throw error;
+            if (error instanceof BadRequestException || error instanceof NotFoundException) {
+                throw error;
+            }
             throw new InternalServerErrorException(
-                'Terjadi kesalahan saat membuat pesanan, coba lagi',
+                'Terjadi kesalahan saat memproses checkout pesanan: ' + (error as Error).message,
             );
         }
     }
@@ -237,9 +206,7 @@ export class OrdersService {
         }
 
         if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-            throw new BadRequestException(
-                'startDate tidak boleh lebih besar dari endDate',
-            );
+            throw new BadRequestException('startDate tidak boleh lebih besar dari endDate');
         }
 
         const skip = (Number(page) - 1) * Number(limit);
@@ -344,15 +311,11 @@ export class OrdersService {
         };
 
         if (order.status === OrderStatus.COMPLETED) {
-            throw new BadRequestException(
-                'Pesanan yang sudah selesai tidak bisa diubah statusnya',
-            );
+            throw new BadRequestException('Pesanan yang sudah selesai tidak bisa diubah statusnya');
         }
 
         if (order.status === OrderStatus.CANCELLED) {
-            throw new BadRequestException(
-                'Pesanan yang sudah dibatalkan tidak bisa diubah statusnya',
-            );
+            throw new BadRequestException('Pesanan yang sudah dibatalkan tidak bisa diubah statusnya');
         }
 
         if (!allowedTransitions[order.status].includes(dto.status)) {
@@ -366,9 +329,7 @@ export class OrdersService {
             order.paymentStatus === 'PAID' &&
             dto.paymentStatus !== 'PAID'
         ) {
-            throw new BadRequestException(
-                'Status pembayaran yang sudah PAID tidak bisa diubah',
-            );
+            throw new BadRequestException('Status pembayaran yang sudah PAID tidak bisa diubah kembali');
         }
 
         try {

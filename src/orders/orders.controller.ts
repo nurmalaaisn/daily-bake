@@ -20,12 +20,12 @@ import { Role } from '@prisma/client';
 export class OrdersController {
     constructor(private ordersService: OrdersService) { }
 
-    @Post()
+    @Post('checkout')
     @UseGuards(RolesGuard)
     @Roles(Role.CUSTOMER)
-    @ApiOperation({ summary: 'Buat pesanan baru — Customer only' })
-    create(@Req() req: any, @Body() dto: CreateOrderDto) {
-        return this.ordersService.create(req.user.id, dto);
+    @ApiOperation({ summary: 'Melakukan checkout pesanan baru dari item keranjang — Customer only' })
+    checkout(@Req() req: any, @Body() dto: CreateOrderDto) {
+        return this.ordersService.checkout(req.user.id, dto);
     }
 
     @Get('my')
