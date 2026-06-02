@@ -35,7 +35,9 @@ export class AuthService {
         }
 
         if (dto.password.length < 6) {
-            throw new BadRequestException('Password minimal 6 karakter');
+            throw new BadRequestException(
+                'Password minimal 6 karakter',
+            );
         }
 
         const existing = await this.prisma.user.findUnique({
@@ -49,12 +51,15 @@ export class AuthService {
         }
 
         try {
-            const hashed = await bcrypt.hash(dto.password, 10);
+            const hashedPassword = await bcrypt.hash(
+                dto.password,
+                10,
+            );
 
             const user = await this.prisma.user.create({
                 data: {
                     ...dto,
-                    password: hashed,
+                    password: hashedPassword,
                 },
             });
 
@@ -81,7 +86,7 @@ export class AuthService {
             };
         } catch {
             throw new InternalServerErrorException(
-                'Terjadi kesalahan saat registrasi, coba lagi',
+                'Terjadi kesalahan saat registrasi',
             );
         }
     }
@@ -94,12 +99,14 @@ export class AuthService {
         }
 
         const user = await this.prisma.user.findUnique({
-            where: { email: dto.email },
+            where: {
+                email: dto.email,
+            },
         });
 
         if (!user) {
             throw new UnauthorizedException(
-                'Email tidak terdaftar, silakan register terlebih dahulu',
+                'Email tidak terdaftar',
             );
         }
 
@@ -110,7 +117,7 @@ export class AuthService {
 
         if (!validPassword) {
             throw new UnauthorizedException(
-                'Password salah, periksa kembali password kamu',
+                'Password salah',
             );
         }
 
@@ -138,12 +145,15 @@ export class AuthService {
             };
         } catch {
             throw new InternalServerErrorException(
-                'Terjadi kesalahan saat login, coba lagi',
+                'Terjadi kesalahan saat login',
             );
         }
     }
 
-    async refresh(userId: number, refreshToken: string) {
+    async refresh(
+        userId: number,
+        refreshToken: string,
+    ) {
         if (!refreshToken) {
             throw new BadRequestException(
                 'Refresh token wajib diisi',
@@ -156,7 +166,7 @@ export class AuthService {
 
         if (!user) {
             throw new ForbiddenException(
-                'User tidak ditemukan, silakan login ulang',
+                'User tidak ditemukan',
             );
         }
 
@@ -166,14 +176,14 @@ export class AuthService {
             );
         }
 
-        const match = await bcrypt.compare(
+        const tokenMatch = await bcrypt.compare(
             refreshToken,
             user.refreshToken,
         );
 
-        if (!match) {
+        if (!tokenMatch) {
             throw new ForbiddenException(
-                'Refresh token tidak valid, silakan login ulang',
+                'Refresh token tidak valid',
             );
         }
 
@@ -201,7 +211,7 @@ export class AuthService {
             };
         } catch {
             throw new InternalServerErrorException(
-                'Terjadi kesalahan saat memperbarui token, coba lagi',
+                'Terjadi kesalahan saat refresh token',
             );
         }
     }
@@ -244,17 +254,18 @@ export class AuthService {
             const [accessToken, refreshToken] =
                 await Promise.all([
                     this.jwt.signAsync(payload, {
-                        secret: this.config.get<string>('JWT_SECRET'),
-                        expiresIn:
-                            this.config.get<string>('JWT_EXPIRES_IN'),
+                        secret:
+                            this.config.get<string>(
+                                'JWT_SECRET',
+                            ) || 'jwt-secret',
+                        expiresIn: '5h',
                     }),
                     this.jwt.signAsync(payload, {
-                        secret: this.config.get<string>(
-                            'JWT_REFRESH_SECRET',
-                        ),
-                        expiresIn: this.config.get<string>(
-                            'JWT_REFRESH_EXPIRES_IN',
-                        ),
+                        secret:
+                            this.config.get<string>(
+                                'JWT_REFRESH_SECRET',
+                            ) || 'jwt-refresh-secret',
+                        expiresIn: '7d',
                     }),
                 ]);
 
@@ -274,7 +285,10 @@ export class AuthService {
         token: string,
     ) {
         try {
-            const hashedToken = await bcrypt.hash(token, 10);
+            const hashedToken = await bcrypt.hash(
+                token,
+                10,
+            );
 
             await this.prisma.user.update({
                 where: { id: userId },
@@ -284,7 +298,7 @@ export class AuthService {
             });
         } catch {
             throw new InternalServerErrorException(
-                'Gagal menyimpan sesi login',
+                'Gagal menyimpan refresh token',
             );
         }
     }
