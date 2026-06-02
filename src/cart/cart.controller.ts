@@ -17,25 +17,25 @@ export class CartController {
 
     @Post()
     @ApiOperation({ summary: 'Tambah produk ke keranjang (atau tambah quantity jika sudah ada)' })
-    addToCart(@Req() req: any, @Body() dto: AddToCartDto) {
-        return this.cartService.addToCart(req.user.id, dto);
+    async addToCart(@Req() req: any, @Body() dto: AddToCartDto) {
+        return await this.cartService.addToCart(req.user.id, dto);
     }
 
     @Get()
     @ApiOperation({ summary: 'Lihat seluruh isi keranjang belanja milik saya' })
-    getCart(@Req() req: any) {
-        return this.cartService.getCart(req.user.id);
+    async getCart(@Req() req: any) {
+        return await this.cartService.getCart(req.user.id);
     }
 
     @Delete('product/:productId')
     @ApiOperation({ summary: 'Hapus satu jenis produk dari keranjang' })
-    removeCartItem(@Req() req: any, @Param('productId', ParseIntPipe) productId: number) {
-        return this.cartService.removeCartItem(req.user.id, productId);
+    async removeCartItem(@Req() req: any, @Param('productId', ParseIntPipe) productId: number) {
+        return await this.cartService.removeCartItem(req.user.id, productId);
     }
 
     @Delete('clear')
     @ApiOperation({ summary: 'Kosongkan seluruh isi keranjang belanja' })
-    clearCart(@Req() req: any) {
-        return this.cartService.clearCart(req.user.id);
+    async clearCart(@Req() req: any) {
+        return await this.cartService.clearCart(req.user.id);
     }
 }

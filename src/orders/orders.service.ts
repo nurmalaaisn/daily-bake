@@ -75,12 +75,12 @@ export class OrdersService {
                         throw new BadRequestException(`Stok produk "${item.product.name}" habis`);
                     }
 
-                    // PERBAIKAN RAW SQL: Nama tabel asli kamu di DB PostgreSQL adalah "products" (bukan "Product")
+                    // PERBAIKAN RAW SQL: Nama tabel asli di DB PostgreSQL adalah "products"
                     const affectedRows = await tx.$executeRaw`
-            UPDATE products 
-            SET stock = stock - ${item.quantity} 
-            WHERE id = ${item.productId} AND stock >= ${item.quantity}
-          `;
+                        UPDATE products 
+                        SET stock = stock - ${item.quantity} 
+                        WHERE id = ${item.productId} AND stock >= ${item.quantity}
+                    `;
 
                     if (affectedRows === 0) {
                         throw new BadRequestException(`Stok produk "${item.product.name}" tidak mencukupi atau baru saja berubah`);
@@ -169,16 +169,22 @@ export class OrdersService {
                 include: {
                     orderItems: { include: { product: true } },
                     statusLogs: { orderBy: { changedAt: 'asc' } },
-                    reviews: true,
                 },
                 orderBy: { createdAt: 'desc' },
             });
 
             if (orders.length === 0) {
-                return { message: 'Kamu belum memiliki pesanan', data: [] };
+                return {
+                    message: 'Kamu belum memiliki riwayat pesanan',
+                    data: []
+                };
             }
 
-            return { total: orders.length, data: orders };
+            return {
+                message: 'Data riwayat pesanan berhasil diambil',
+                total: orders.length,
+                data: orders
+            };
         } catch (error) {
             throw new InternalServerErrorException(
                 'Terjadi kesalahan saat mengambil data pesanan',
@@ -238,13 +244,14 @@ export class OrdersService {
                 return {
                     message: status
                         ? `Tidak ada pesanan dengan status ${status}`
-                        : 'Belum ada pesanan masuk',
+                        : 'Belum ada data pesanan masuk',
                     data: [],
                     meta: { total: 0, page: Number(page), limit: Number(limit), totalPages: 0 },
                 };
             }
 
             return {
+                message: 'Semua data pesanan berhasil diambil',
                 data,
                 meta: {
                     total,
@@ -277,9 +284,6 @@ export class OrdersService {
                     },
                     orderBy: { changedAt: 'asc' },
                 },
-                reviews: {
-                    include: { customer: { select: { id: true, name: true } } },
-                },
             },
         });
 
@@ -287,7 +291,10 @@ export class OrdersService {
             throw new NotFoundException(`Pesanan dengan id ${id} tidak ditemukan`);
         }
 
-        return order;
+        return {
+            message: `Detail pesanan dengan ID ${id} berhasil ditemukan`,
+            data: order
+        };
     }
 
     async updateStatus(
@@ -299,7 +306,9 @@ export class OrdersService {
             throw new BadRequestException('ID pesanan tidak valid');
         }
 
-        const order = await this.findOne(id);
+        // Panggil findOne untuk validasi keberadaan pesanan
+        const orderResult = await this.findOne(id);
+        const order = orderResult.data; // Ambil object order asli dari wrapper response findOne
 
         const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
             PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],

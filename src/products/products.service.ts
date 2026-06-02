@@ -136,11 +136,7 @@ export class ProductsService {
                     where,
                     include: {
                         category: true,
-                        _count: {
-                            select: {
-                                reviews: true,
-                            },
-                        },
+                        // 🌟 Penghitungan relasi _count ke reviews telah dihapus dari sini
                     },
                     skip,
                     take: Number(limit),
@@ -149,36 +145,10 @@ export class ProductsService {
                 this.prisma.product.count({ where }),
             ]);
 
-            const productIds = data.map((product) => product.id);
-
-            const ratings = await this.prisma.review.groupBy({
-                by: ['productId'],
-                where: {
-                    productId: {
-                        in: productIds,
-                    },
-                },
-                _avg: {
-                    rating: true,
-                },
-            });
-
-            const dataWithRating = data.map((product) => {
-                const ratingData = ratings.find(
-                    (r) => r.productId === product.id,
-                );
-
-                return {
-                    ...product,
-                    averageRating:
-                        ratingData?._avg?.rating != null
-                            ? Number(ratingData._avg.rating.toFixed(1))
-                            : null,
-                };
-            });
+            // 🌟 Blok raw aggregation query data rating lewat `this.prisma.review.groupBy` sepenuhnya telah dihapus
 
             return {
-                data: dataWithRating,
+                data: data, // Langsung mengembalikan objek data produk bersih tanpa data averageRating lama
                 meta: {
                     total,
                     page: Number(page),
@@ -202,24 +172,7 @@ export class ProductsService {
             where: { id },
             include: {
                 category: true,
-                reviews: {
-                    include: {
-                        customer: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                },
-                _count: {
-                    select: {
-                        reviews: true,
-                    },
-                },
+                // 🌟 Relasi reviews [] dan _count reviews telah dihapus total dari sini
             },
         });
 
@@ -229,22 +182,9 @@ export class ProductsService {
             );
         }
 
-        const ratingAgg = await this.prisma.review.aggregate({
-            where: {
-                productId: id,
-            },
-            _avg: {
-                rating: true,
-            },
-        });
+        // 🌟 Blok penghitungan rata-rata rating dengan `this.prisma.review.aggregate` telah dihapus
 
-        return {
-            ...product,
-            averageRating:
-                ratingAgg._avg?.rating != null
-                    ? Number(ratingAgg._avg.rating.toFixed(1))
-                    : null,
-        };
+        return product;
     }
 
     async update(
