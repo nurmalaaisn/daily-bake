@@ -25,7 +25,7 @@ enum OrderStatus {
 enum PaymentMethod {
   BANK_TRANSFER
   E_WALLET
-  COD
+  CASH
 }
 
 enum PaymentStatus {
