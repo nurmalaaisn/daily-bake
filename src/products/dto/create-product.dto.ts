@@ -1,7 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-    IsBoolean, IsInt, IsNotEmpty,
-    IsOptional, IsString, Min,
+    IsBoolean,
+    IsInt,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -11,7 +15,9 @@ export class CreateProductDto {
     @IsString()
     name: string;
 
-    @ApiPropertyOptional({ example: 'Kue lapis coklat dengan topping strawberry' })
+    @ApiPropertyOptional({
+        example: 'Kue lapis coklat dengan topping strawberry',
+    })
     @IsOptional()
     @IsString()
     description?: string;
@@ -38,4 +44,10 @@ export class CreateProductDto {
     @IsBoolean()
     @Type(() => Boolean)
     isAvailable?: boolean;
+
+    @ApiPropertyOptional({
+        type: 'string',
+        format: 'binary',
+    })
+    image?: any;
 }

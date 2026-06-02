@@ -62,7 +62,41 @@ export class ProductsController {
         }),
     )
     @ApiConsumes('multipart/form-data')
-    @ApiBody({ type: CreateProductDto })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                name: {
+                    type: 'string',
+                    example: 'Kue Coklat Lapis',
+                },
+                description: {
+                    type: 'string',
+                    example: 'Kue lapis coklat dengan topping strawberry',
+                },
+                price: {
+                    type: 'number',
+                    example: 150000,
+                },
+                stock: {
+                    type: 'number',
+                    example: 10,
+                },
+                categoryId: {
+                    type: 'number',
+                    example: 1,
+                },
+                isAvailable: {
+                    type: 'boolean',
+                    example: true,
+                },
+                image: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
     @ApiOperation({ summary: 'Buat produk baru' })
     async create(
         @Body() dto: CreateProductDto,
@@ -103,7 +137,35 @@ export class ProductsController {
         }),
     )
     @ApiConsumes('multipart/form-data')
-    @ApiBody({ type: UpdateProductDto })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                name: {
+                    type: 'string',
+                },
+                description: {
+                    type: 'string',
+                },
+                price: {
+                    type: 'number',
+                },
+                stock: {
+                    type: 'number',
+                },
+                categoryId: {
+                    type: 'number',
+                },
+                isAvailable: {
+                    type: 'boolean',
+                },
+                image: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
     @ApiOperation({ summary: 'Update produk' })
     async update(
         @Param('id', ParseIntPipe) id: number,
