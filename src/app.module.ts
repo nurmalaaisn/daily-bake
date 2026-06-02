@@ -11,7 +11,6 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { ReportsModule } from './reports/reports.module';
-import { ReviewsModule } from './reviews/reviews.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 import { CartModule } from './cart/cart.module'; // Import CartModule yang baru dibuat
 
@@ -26,8 +25,7 @@ import { CartModule } from './cart/cart.module'; // Import CartModule yang baru 
     ProductsModule,
     OrdersModule,
     ReportsModule,
-    ReviewsModule,
-    CartModule, // Registrasikan Modul Keranjang di sini
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
