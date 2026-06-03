@@ -10,11 +10,84 @@ import { OrderStatus } from '@prisma/client';
 export class ReportsService {
     constructor(private prisma: PrismaService) { }
 
-    // ... method getDashboard() tetap sama seperti sebelumnya ...
+    /**
+     * Get Summary Data untuk Dashboard (Baker & Admin)
+     */
     async getDashboard() {
-        // [Kode getDashboard tidak diubah]
+        try {
+            const [
+                totalOrders,
+                totalCustomers,
+                pendingOrders,
+                confirmedOrders,
+                bakingOrders,
+                readyOrders,
+                completedOrders,
+                cancelledOrders,
+                ordersForRevenue, // Mengambil data order untuk dihitung manual (Aman dari bug tipe data String)
+                topProducts,
+            ] = await Promise.all([
+                this.prisma.order.count(),
+                this.prisma.user.count({ where: { role: 'CUSTOMER' } }),
+                this.prisma.order.count({ where: { status: OrderStatus.PENDING } }),
+                this.prisma.order.count({ where: { status: OrderStatus.CONFIRMED } }),
+                this.prisma.order.count({ where: { status: OrderStatus.BAKING } }),
+                this.prisma.order.count({ where: { status: OrderStatus.READY } }),
+                this.prisma.order.count({ where: { status: OrderStatus.COMPLETED } }),
+                this.prisma.order.count({ where: { status: OrderStatus.CANCELLED } }),
+                this.prisma.order.findMany({
+                    where: { status: OrderStatus.COMPLETED },
+                    select: { totalPrice: true },
+                }),
+                this.prisma.orderItem.groupBy({
+                    by: ['productId'],
+                    _sum: { quantity: true },
+                    orderBy: { _sum: { quantity: 'desc' } },
+                    take: 5,
+                }),
+            ]);
+
+            // Hitung total pendapatan secara aman dengan konversi Number()
+            const totalRevenue = ordersForRevenue.reduce((sum, o) => sum + Number(o.totalPrice), 0);
+
+            // Ambil detail nama produk untuk Top 5 Products
+            const productIds = topProducts.map((p) => p.productId);
+            const products = await this.prisma.product.findMany({
+                where: { id: { in: productIds } },
+                select: { id: true, name: true, price: true },
+            });
+
+            const topProductsWithDetail = topProducts.map((item) => ({
+                product: products.find((p) => p.id === item.productId) ?? null,
+                totalSold: item._sum.quantity ?? 0,
+            }));
+
+            return {
+                totalOrders,
+                totalCustomers,
+                orderSummary: {
+                    pending: pendingOrders,
+                    confirmed: confirmedOrders,
+                    baking: bakingOrders,
+                    ready: readyOrders,
+                    completed: completedOrders,
+                    cancelled: cancelledOrders,
+                },
+                totalRevenue,
+                topProducts: topProductsWithDetail,
+            };
+        } catch (error) {
+            // Mencetak log error asli ke console Railway agar mudah dilacak jika ada kendala DB
+            console.error('ERROR DASHBOARD SERVICE:', error);
+            throw new InternalServerErrorException(
+                `Terjadi kesalahan saat mengambil data dashboard: ${(error as Error).message}`,
+            );
+        }
     }
 
+    /**
+     * Get Laporan Transaksi Lengkap dengan Filter (StartDate, EndDate, Status)
+     */
     async getOrderReport(query: {
         startDate?: string;
         endDate?: string;
@@ -74,7 +147,7 @@ export class ReportsService {
                         : 'Tidak ada data pesanan pada periode ini',
                     totalOrders: 0,
                     totalRevenue: 0,
-                    totalItemsSold: 0, // Ditambahkan agar frontend aman dari null/0
+                    totalItemsSold: 0,
                     orders: [],
                 };
             }
@@ -84,8 +157,7 @@ export class ReportsService {
                 .filter((o) => o.status === OrderStatus.COMPLETED)
                 .reduce((sum, o) => sum + Number(o.totalPrice), 0);
 
-            // 2. LOGIKA BARU: Hitung total pcs kue yang terjual
-            // Catatan: Sesuai standar report, pesanan CANCELLED tidak dihitung sebagai barang terjual
+            // 2. Hitung total pcs kue yang terjual (Abaikan status CANCELLED)
             const totalItemsSold = orders
                 .filter((o) => o.status !== OrderStatus.CANCELLED)
                 .reduce((sum, order) => {
@@ -96,10 +168,11 @@ export class ReportsService {
             return {
                 totalOrders: orders.length,
                 totalRevenue,
-                totalItemsSold, // <--- Sekarang properti ini terkirim di root JSON!
+                totalItemsSold, 
                 orders,
             };
         } catch (error) {
+            console.error('ERROR ORDER REPORT SERVICE:', error);
             if (error instanceof BadRequestException) throw error;
             throw new InternalServerErrorException(
                 'Terjadi kesalahan saat mengambil laporan transaksi',
